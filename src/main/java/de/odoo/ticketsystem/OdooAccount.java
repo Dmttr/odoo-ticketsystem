@@ -32,6 +32,17 @@ public class OdooAccount {
     private boolean loggedIn = false;
     private int uid;
 
+    private static final Map<String, Integer> odooColors;
+    static
+    {
+        odooColors = new HashMap<>();
+        odooColors.put("white",	0);
+        odooColors.put("red", 1);
+        odooColors.put("orange", 2);
+        odooColors.put("yellow", 3);
+        odooColors.put("blue", 4);
+    }
+
     @RequestMapping("")
     public String authenticate() throws MalformedURLException {
         client = new XmlRpcClient();
@@ -85,7 +96,6 @@ public class OdooAccount {
                             asList("name", "=", name))),
                     new HashMap() {{
                         put("fields", asList("name", "country_id", "im_status", "comment", "color"));
-                        put("limit", 5);
                     }}
             )));
         } catch (XmlRpcException e) {
@@ -103,7 +113,7 @@ public class OdooAccount {
         try {
             return (Map<String, Map<String, Object>>)models.execute("execute_kw", asList(
                     db, uid, password,
-                    "res.partner", "fields_get",
+                    "helpdesk.ticket", "fields_get",
                     emptyList(),
                     new HashMap() {{
                         put("attributes", asList("string", "help", "type"));
@@ -115,7 +125,7 @@ public class OdooAccount {
         }
     }
     @RequestMapping("update")
-    public String updateRecord(@RequestParam(value = "id", defaultValue = "1")int id) throws MalformedURLException {
+    public String updateRecord(@RequestParam Map<String,String> requestParams) throws MalformedURLException {
         models = new XmlRpcClient() {{
             setConfig(new XmlRpcClientConfigImpl() {{
                 setServerURL(new URL(String.format("%s/xmlrpc/2/object", url)));
@@ -124,10 +134,11 @@ public class OdooAccount {
         try {
             models.execute("execute_kw", asList(
                     db, uid, password,
-                    "res.partner", "write",
+                    "helpdesk.ticket", "write",
                     asList(
-                            asList(id),
-                            new HashMap() {{ put("color", 3); }}
+                            asList(Integer.parseInt(requestParams.get("id"))),
+                            new HashMap() {{ put(requestParams.get("fieldName"),
+                                    Integer.parseInt(requestParams.get("value"))); }}
                     )
             ));
         } catch (XmlRpcException e) {
