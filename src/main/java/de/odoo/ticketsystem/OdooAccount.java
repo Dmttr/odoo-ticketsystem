@@ -62,17 +62,25 @@ public class OdooAccount {
     }
 
     @RequestMapping("create")
-    public String createTicket() throws MalformedURLException {
+    public String createTicket(@RequestParam Map<String,String> requestParams) throws MalformedURLException {
         models = new XmlRpcClient() {{
             setConfig(new XmlRpcClientConfigImpl() {{
                 setServerURL(new URL(String.format("%s/xmlrpc/2/object", url)));
             }});
         }};
+        String body = "<p style='margin:0px 0px 9px 0px; font-size:20px; font-family:\"Lucida Grande\", Helvetica, Verdana, Arial, sans-serif'>Hey,</p><p style='margin:0px 0px 9px 0px; font-size:13px; font-family:\"Lucida Grande\", Helvetica, Verdana, Arial, sans-serif'><br></p><p style='margin:0px 0px 9px 0px; font-size:13px; font-family:\"Lucida Grande\", Helvetica, Verdana, Arial, sans-serif'>this is a test.</p><p style='margin:0px 0px 9px 0px; font-size:13px; font-family:\"Lucida Grande\", Helvetica, Verdana, Arial, sans-serif'><br></p><p style='margin:0px 0px 9px 0px; font-size:13px; font-family:\"Lucida Grande\", Helvetica, Verdana, Arial, sans-serif'>Regards</p><p style='margin:0px 0px 9px 0px; font-size:13px; font-family:\"Lucida Grande\", Helvetica, Verdana, Arial, sans-serif'>Username</p>";
         try {
             int id = (Integer)models.execute("execute_kw", asList(
                     db, uid, password,
-                    "helpdesk.ticket", "create",
-                    asList(new HashMap() {{ put("name", "Test ticket"); }})
+                    "mail.compose.message", "create",
+                    asList(new HashMap() {{
+                        put("subject", requestParams.get("subject"));
+                        put("res_id", Integer.parseInt(requestParams.get("res_id")));
+                        put("model", "helpdesk.ticket");
+                        put("body", body);
+                        put("composition_mode", "comment");
+                        put("is_log", true);
+                    }})
             ));
             return "" + id;
         } catch (XmlRpcException e) {
@@ -81,6 +89,30 @@ public class OdooAccount {
         }
     }
     @RequestMapping("search-read")
+    public List read(@RequestParam Map<String,String> requestParams)
+            throws MalformedURLException {
+        models = new XmlRpcClient() {{
+            setConfig(new XmlRpcClientConfigImpl() {{
+                setServerURL(new URL(String.format("%s/xmlrpc/2/object", url)));
+            }});
+        }};
+        try {
+            return asList((Object[])models.execute("execute_kw", asList(
+                    db, uid, password,
+                    requestParams.get("entity"), "search_read",
+                    asList(asList(
+                            asList("subject", "=", requestParams.get("subject")))),
+                    new HashMap() {{
+                        put("fields", asList("email_from", "email_to", "subject", "attachment_ids", "body",
+                                "model", "res_id", "composition_mode", "is_log"));
+                    }}
+            )));
+        } catch (XmlRpcException e) {
+            e.printStackTrace();
+            return asList(e.getMessage());
+        }
+    }
+    @RequestMapping("search-readt")
     public List readTicket(@RequestParam(value = "name", defaultValue = "Test ticket")String name)
             throws MalformedURLException {
         models = new XmlRpcClient() {{
@@ -95,7 +127,7 @@ public class OdooAccount {
                     asList(asList(
                             asList("name", "=", name))),
                     new HashMap() {{
-                        put("fields", asList("name", "country_id", "im_status", "comment", "color"));
+                        put("fields", asList("name", "tag_ids"));
                     }}
             )));
         } catch (XmlRpcException e) {
@@ -103,8 +135,10 @@ public class OdooAccount {
             return asList(e.getMessage());
         }
     }
+
     @RequestMapping("getfields")
-    public Map<String, Map<String, Object>> getFields() throws MalformedURLException {
+    public Map<String, Map<String, Object>> getFields(@RequestParam(value = "entity")String entityType)
+            throws MalformedURLException {
         models = new XmlRpcClient() {{
             setConfig(new XmlRpcClientConfigImpl() {{
                 setServerURL(new URL(String.format("%s/xmlrpc/2/object", url)));
@@ -113,7 +147,7 @@ public class OdooAccount {
         try {
             return (Map<String, Map<String, Object>>)models.execute("execute_kw", asList(
                     db, uid, password,
-                    "helpdesk.ticket", "fields_get",
+                    entityType, "fields_get",
                     emptyList(),
                     new HashMap() {{
                         put("attributes", asList("string", "help", "type"));
@@ -125,7 +159,7 @@ public class OdooAccount {
         }
     }
     @RequestMapping("update")
-    public String updateRecord(@RequestParam Map<String,String> requestParams) throws MalformedURLException {
+    public String updateRecord(@RequestParam Map<String,String> reqParams) throws MalformedURLException {
         models = new XmlRpcClient() {{
             setConfig(new XmlRpcClientConfigImpl() {{
                 setServerURL(new URL(String.format("%s/xmlrpc/2/object", url)));
@@ -134,11 +168,14 @@ public class OdooAccount {
         try {
             models.execute("execute_kw", asList(
                     db, uid, password,
-                    "helpdesk.ticket", "write",
+                    reqParams.get("entity"), "write",
                     asList(
-                            asList(Integer.parseInt(requestParams.get("id"))),
-                            new HashMap() {{ put(requestParams.get("fieldName"),
-                                    Integer.parseInt(requestParams.get("value"))); }}
+                            asList(Integer.parseInt(reqParams.get("id"))),
+                            new HashMap() {{
+                                put(reqParams.get("fieldName"),
+                                    asList(asList(6, Integer.parseInt(reqParams.get("id")), asList(7,1)))
+                                );
+                            }}
                     )
             ));
         } catch (XmlRpcException e) {
